@@ -1,0 +1,792 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f3f6f5">
+    <title>Cash Flow Summary</title>
+    <style>
+        :root {
+            color-scheme: light;
+            --ink: #172b2b;
+            --muted: #657777;
+            --line: #dce5e2;
+            --paper: #ffffff;
+            --canvas: #f3f6f5;
+            --green: #137b5a;
+            --green-soft: #e7f4ee;
+            --red: #b75045;
+            --red-soft: #fbefed;
+            --blue: #416a82;
+            --blue-soft: #edf3f7;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: var(--canvas);
+            color: var(--ink);
+            font-family: "Segoe UI", sans-serif;
+        }
+
+        .topline {
+            height: 5px;
+            background: linear-gradient(90deg, var(--green) 0 34%, #d5a852 34% 68%, var(--blue) 68%);
+        }
+
+        main {
+            width: min(100% - 40px, 920px);
+            margin: 0 auto;
+            padding: 64px 0 48px;
+        }
+
+        .heading-row {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 24px;
+            margin-bottom: 30px;
+        }
+
+        .eyebrow {
+            margin: 0 0 9px;
+            color: var(--green);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 1.4px;
+            text-transform: uppercase;
+        }
+
+        h1 {
+            margin: 0;
+            font-family: Georgia, "Times New Roman", serif;
+            font-size: 38px;
+            font-weight: 500;
+            line-height: 1.12;
+        }
+
+        .subtitle {
+            margin: 10px 0 0;
+            color: var(--muted);
+            font-size: 15px;
+        }
+
+        button {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            min-height: 42px;
+            padding: 0 15px;
+            border: 1px solid #cbd8d4;
+            border-radius: 5px;
+            background: var(--paper);
+            color: var(--ink);
+            font: inherit;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: border-color 140ms ease, background 140ms ease;
+        }
+
+        button:hover { border-color: var(--green); background: #f8fcfa; }
+        button:focus-visible { outline: 3px solid #9fd6c2; outline-offset: 2px; }
+        button:disabled { cursor: wait; opacity: 0.65; }
+
+        .refresh-mark {
+            color: var(--green);
+            font-size: 18px;
+            line-height: 1;
+        }
+
+        .summary-panel {
+            overflow: hidden;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            background: var(--paper);
+            box-shadow: 0 12px 32px rgb(23 43 43 / 5%);
+        }
+
+        .entry-panel {
+            margin-top: 24px;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            background: var(--paper);
+        }
+
+        .records-panel {
+            margin-top: 24px;
+            overflow: hidden;
+            border: 1px solid var(--line);
+            border-radius: 7px;
+            background: var(--paper);
+        }
+
+        .search-form {
+            display: grid;
+            grid-template-columns: minmax(0, 1fr) auto;
+            align-items: end;
+            gap: 14px;
+            padding: 20px 24px;
+        }
+
+        .search-field { min-width: 0; }
+
+        .search-field label {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .search-field input {
+            width: 100%;
+            min-height: 44px;
+            padding: 0 12px;
+            border: 1px solid #cbd8d4;
+            border-radius: 4px;
+            background: var(--paper);
+            color: var(--ink);
+            font: inherit;
+            font-size: 14px;
+        }
+
+        .search-field input:focus-visible { outline: 3px solid #9fd6c2; outline-offset: 1px; }
+        .search-button { min-height: 44px; }
+
+        .table-scroll { overflow-x: auto; }
+        .records-table { min-width: 520px; }
+        .records-table th:last-child, .records-table td:last-child { text-align: left; }
+        .records-table td { padding-top: 14px; padding-bottom: 14px; }
+        .record-row { cursor: pointer; }
+        .record-row:hover { background: #f8fbf9; }
+        .record-row:focus { outline: 2px solid var(--green); outline-offset: -2px; }
+        .record-row[aria-selected="true"] { background: var(--green-soft); }
+        .record-amount { text-align: right !important; font-variant-numeric: tabular-nums; }
+
+        .results-status {
+            min-height: 44px;
+            padding: 13px 24px;
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .results-status[data-state="error"] { color: #9e3f36; background: var(--red-soft); }
+
+        .record-editor {
+            border-top: 1px solid var(--line);
+            background: #fbfcfc;
+        }
+
+        .record-editor[hidden], .records-table[hidden] { display: none; }
+
+        .editor-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 18px 24px 0;
+        }
+
+        .editor-heading h3 { margin: 0; font-size: 14px; }
+
+        .editor-form {
+            display: grid;
+            grid-template-columns: minmax(120px, 0.8fr) minmax(120px, 1fr) minmax(0, 1.5fr);
+            align-items: end;
+            gap: 16px;
+            padding: 18px 24px 22px;
+        }
+
+        .editor-type-options { min-height: 44px; }
+
+        .editor-actions {
+            display: flex;
+            align-items: center;
+            gap: 9px;
+            grid-column: 1 / -1;
+        }
+
+        .save-button { border-color: var(--green); background: var(--green); color: #fff; }
+        .save-button:hover { border-color: #0f684b; background: #0f684b; color: #fff; }
+        .delete-button { margin-left: auto; border-color: #e2b6b1; color: #9e3f36; }
+        .delete-button:hover { border-color: var(--red); background: var(--red-soft); }
+
+        .entry-form {
+            display: grid;
+            grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr) minmax(0, 1.3fr) minmax(0, 1.7fr) auto;
+            align-items: end;
+            gap: 18px;
+            padding: 24px;
+        }
+
+        .field { min-width: 0; }
+
+        .field label, .field legend {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--muted);
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .field input:not([type="radio"]) {
+            width: 100%;
+            min-height: 44px;
+            padding: 0 12px;
+            border: 1px solid #cbd8d4;
+            border-radius: 4px;
+            background: var(--paper);
+            color: var(--ink);
+            font: inherit;
+            font-size: 14px;
+        }
+
+        .field input:focus-visible {
+            outline: 3px solid #9fd6c2;
+            outline-offset: 1px;
+        }
+
+        .type-field { margin: 0; padding: 0; border: 0; }
+
+        .type-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            min-height: 44px;
+            padding: 3px;
+            border: 1px solid #cbd8d4;
+            border-radius: 5px;
+            background: #f5f8f7;
+        }
+
+        .type-option {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            margin: 0;
+            border-radius: 3px;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .type-option input { accent-color: var(--green); }
+
+        .type-option:has(input:checked) {
+            background: var(--paper);
+            color: var(--ink);
+            box-shadow: 0 1px 4px rgb(23 43 43 / 12%);
+        }
+
+        .submit-button {
+            min-height: 44px;
+            border-color: var(--green);
+            background: var(--green);
+            color: #fff;
+            white-space: nowrap;
+        }
+
+        .submit-button:hover { background: #0f684b; color: #fff; }
+
+        .form-status {
+            min-height: 0;
+            padding: 0 24px;
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .form-status:not(:empty) {
+            min-height: 48px;
+            padding: 14px 24px;
+            border-top: 1px solid var(--line);
+        }
+
+        .form-status[data-state="error"] { color: #9e3f36; background: var(--red-soft); }
+        .form-status[data-state="success"] { color: var(--green); background: #f8fbf9; }
+
+        .panel-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .panel-heading h2 {
+            margin: 0;
+            font-size: 16px;
+            font-weight: 650;
+        }
+
+        #updated-at {
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        table { width: 100%; border-collapse: collapse; }
+
+        thead { background: #f8faf9; }
+
+        th {
+            padding: 12px 24px;
+            color: var(--muted);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            text-align: left;
+            text-transform: uppercase;
+        }
+
+        th:last-child, td:last-child { text-align: right; }
+
+        td {
+            padding: 19px 24px;
+            border-top: 1px solid #edf1ef;
+            font-size: 15px;
+        }
+
+        .metric {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 600;
+        }
+
+        .marker {
+            width: 9px;
+            height: 9px;
+            flex: 0 0 9px;
+            border-radius: 2px;
+            background: var(--green);
+        }
+
+        tr[data-metric="expenses"] .marker { background: #d47769; }
+        tr[data-metric="profit"] .marker { background: #648ba3; }
+
+        .amount {
+            font-variant-numeric: tabular-nums;
+            font-weight: 650;
+        }
+
+        tr[data-metric="revenue"] .amount { color: var(--green); }
+        tr[data-metric="expenses"] .amount { color: var(--red); }
+        tr[data-metric="profit"] .amount { color: var(--blue); }
+
+        .status {
+            min-height: 48px;
+            padding: 14px 24px;
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 13px;
+        }
+
+        .status[data-state="error"] { color: #9e3f36; background: var(--red-soft); }
+        .status[data-state="success"] { background: #f8fbf9; }
+
+        @media (max-width: 600px) {
+            main { width: min(100% - 28px, 920px); padding-top: 38px; }
+            .heading-row { align-items: flex-start; flex-direction: column; margin-bottom: 24px; }
+            h1 { font-size: 33px; }
+            .panel-heading, th, td { padding-right: 16px; padding-left: 16px; }
+            .panel-heading { align-items: flex-start; flex-direction: column; gap: 6px; }
+            .status { padding-right: 16px; padding-left: 16px; }
+            .entry-form { grid-template-columns: 1fr; gap: 16px; padding: 18px 16px; }
+            .submit-button { width: 100%; justify-content: center; }
+            .form-status:not(:empty) { padding-right: 16px; padding-left: 16px; }
+            .search-form { grid-template-columns: 1fr; padding: 18px 16px; }
+            .search-button { width: 100%; justify-content: center; }
+            .results-status { padding-right: 16px; padding-left: 16px; }
+            .editor-heading { padding-right: 16px; padding-left: 16px; }
+            .editor-form { grid-template-columns: 1fr; padding: 16px; }
+            .editor-actions { grid-column: auto; flex-wrap: wrap; }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { scroll-behavior: auto !important; transition-duration: 0.01ms !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="topline" aria-hidden="true"></div>
+    <main>
+        <header class="heading-row">
+            <div>
+                <p class="eyebrow">Cash flow</p>
+                <h1>Summary</h1>
+                <p class="subtitle">A clear view of money in, money out, and the difference.</p>
+            </div>
+            <button id="refresh-button" type="button">
+                <span class="refresh-mark" aria-hidden="true">&#8635;</span>
+                Refresh summary
+            </button>
+        </header>
+
+        <section class="summary-panel" aria-labelledby="table-title">
+            <div class="panel-heading">
+                <h2 id="table-title">Transaction totals</h2>
+                <span id="updated-at">Waiting for data</span>
+            </div>
+            <table>
+                <thead>
+                    <tr><th scope="col">Measure</th><th scope="col">Amount</th></tr>
+                </thead>
+                <tbody>
+                    <tr data-metric="revenue">
+                        <td><span class="metric"><span class="marker" aria-hidden="true"></span>Revenue</span></td>
+                        <td class="amount" id="revenue">--</td>
+                    </tr>
+                    <tr data-metric="expenses">
+                        <td><span class="metric"><span class="marker" aria-hidden="true"></span>Expenses</span></td>
+                        <td class="amount" id="expenses">--</td>
+                    </tr>
+                    <tr data-metric="profit">
+                        <td><span class="metric"><span class="marker" aria-hidden="true"></span>Profit</span></td>
+                        <td class="amount" id="profit">--</td>
+                    </tr>
+                </tbody>
+            </table>
+            <div id="status" class="status" role="status" aria-live="polite">Loading summary...</div>
+        </section>
+
+        <section class="records-panel" aria-labelledby="search-title">
+            <div class="panel-heading">
+                <h2 id="search-title">Find a transaction</h2>
+            </div>
+            <form id="search-form" class="search-form">
+                <div class="search-field">
+                    <label for="title-search">Search by title</label>
+                    <input id="title-search" name="title" type="search" maxlength="100" placeholder="Enter a transaction title" required>
+                </div>
+                <button id="search-button" class="search-button" type="submit">Search records</button>
+            </form>
+            <div class="table-scroll">
+                <table id="records-table" class="records-table" hidden>
+                    <thead>
+                        <tr><th scope="col">Title</th><th scope="col">Amount</th><th scope="col">Description</th></tr>
+                    </thead>
+                    <tbody id="records-body"></tbody>
+                </table>
+            </div>
+            <div id="results-status" class="results-status" role="status" aria-live="polite">Search for a title to find matching transactions.</div>
+            <section id="record-editor" class="record-editor" aria-labelledby="editor-title" hidden>
+                <div class="editor-heading">
+                    <h3 id="editor-title">Edit transaction</h3>
+                </div>
+                <form id="editor-form" class="editor-form">
+                    <div class="field">
+                        <label for="edit-title">Title</label>
+                        <input id="edit-title" name="transaction_title" type="text" maxlength="15" required>
+                    </div>
+                    <fieldset class="field type-field">
+                        <legend>Type</legend>
+                        <div class="type-options editor-type-options">
+                            <label class="type-option"><input type="radio" name="type" value="income" required> Income</label>
+                            <label class="type-option"><input type="radio" name="type" value="expense"> Expense</label>
+                        </div>
+                    </fieldset>
+                    <div class="field">
+                        <label for="edit-amount">Amount</label>
+                        <input id="edit-amount" name="amount" type="number" min="0.01" step="any" required>
+                    </div>
+                    <div class="field">
+                        <label for="edit-description">Description</label>
+                        <input id="edit-description" name="description" type="text" maxlength="255" required>
+                    </div>
+                    <div class="editor-actions">
+                        <button id="save-edit" class="save-button" type="submit">Save changes</button>
+                        <button id="cancel-edit" type="button">Cancel</button>
+                        <button id="delete-record" class="delete-button" type="button">Delete transaction</button>
+                    </div>
+                </form>
+                <div id="editor-status" class="form-status" role="status" aria-live="polite"></div>
+            </section>
+        </section>
+
+        <section class="entry-panel" aria-labelledby="entry-title">
+            <div class="panel-heading">
+                <h2 id="entry-title">Add a transaction</h2>
+            </div>
+            <form id="transaction-form" class="entry-form">
+                <div class="field">
+                    <label for="transaction-title">Title</label>
+                    <input id="transaction-title" name="transaction_title" type="text" maxlength="15" placeholder="e.g. Salary" required>
+                </div>
+                <fieldset class="field type-field">
+                    <legend>Type</legend>
+                    <div class="type-options">
+                        <label class="type-option"><input type="radio" name="type" value="income" checked> Income</label>
+                        <label class="type-option"><input type="radio" name="type" value="expense"> Expense</label>
+                    </div>
+                </fieldset>
+                <div class="field">
+                    <label for="transaction-amount">Amount</label>
+                    <input id="transaction-amount" name="amount" type="number" min="0.01" step="any" placeholder="0.00" required>
+                </div>
+                <div class="field">
+                    <label for="transaction-description">Description</label>
+                    <input id="transaction-description" name="description" type="text" maxlength="255" placeholder="e.g. Monthly salary" required>
+                </div>
+                <button class="submit-button" id="submit-transaction" type="submit">Add transaction</button>
+            </form>
+            <div id="form-status" class="form-status" role="status" aria-live="polite"></div>
+        </section>
+    </main>
+
+    <script>
+        const amountFormatter = new Intl.NumberFormat(undefined, {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2
+        });
+        const refreshButton = document.getElementById("refresh-button");
+        const statusMessage = document.getElementById("status");
+        const updatedAt = document.getElementById("updated-at");
+        const transactionForm = document.getElementById("transaction-form");
+        const submitTransaction = document.getElementById("submit-transaction");
+        const formStatus = document.getElementById("form-status");
+        const searchForm = document.getElementById("search-form");
+        const searchButton = document.getElementById("search-button");
+        const titleSearch = document.getElementById("title-search");
+        const recordsTable = document.getElementById("records-table");
+        const recordsBody = document.getElementById("records-body");
+        const resultsStatus = document.getElementById("results-status");
+        const recordEditor = document.getElementById("record-editor");
+        const editorForm = document.getElementById("editor-form");
+        const editorStatus = document.getElementById("editor-status");
+        const deleteRecordButton = document.getElementById("delete-record");
+        let selectedRecord = null;
+
+        async function loadSummary() {
+            refreshButton.disabled = true;
+            statusMessage.dataset.state = "loading";
+            statusMessage.textContent = "Loading summary...";
+
+            try {
+                const response = await fetch("/api/summary", {
+                    headers: { Accept: "application/json" }
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Request failed (${response.status})`);
+                }
+
+                const summary = await response.json();
+                for (const key of ["revenue", "expenses", "profit"]) {
+                    const value = Number(summary[key]);
+                    if (!Number.isFinite(value)) {
+                        throw new Error("The summary response contains an invalid amount");
+                    }
+                    document.getElementById(key).textContent = amountFormatter.format(value);
+                }
+
+                updatedAt.textContent = `Updated ${new Intl.DateTimeFormat(undefined, {
+                    hour: "numeric",
+                    minute: "2-digit"
+                }).format(new Date())}`;
+                statusMessage.dataset.state = "success";
+                statusMessage.textContent = "Summary is up to date.";
+            } catch (error) {
+                statusMessage.dataset.state = "error";
+                statusMessage.textContent = `Unable to load summary. ${error.message}`;
+                updatedAt.textContent = "Update failed";
+            } finally {
+                refreshButton.disabled = false;
+            }
+        }
+
+        refreshButton.addEventListener("click", loadSummary);
+
+        function showEditor(record) {
+            selectedRecord = record;
+            document.getElementById("edit-title").value = record.transaction_title;
+            document.getElementById("edit-amount").value = record.amount;
+            document.getElementById("edit-description").value = record.description;
+            editorForm.querySelector(`input[name="type"][value="${record.type}"]`).checked = true;
+            editorStatus.textContent = "";
+            deleteRecordButton.disabled = false;
+            recordEditor.hidden = false;
+
+            for (const row of recordsBody.rows) {
+                row.setAttribute("aria-selected", String(Number(row.dataset.id) === Number(record.transaction_id)));
+            }
+        }
+
+        function renderRecords(records) {
+            recordsBody.replaceChildren();
+            recordEditor.hidden = true;
+            selectedRecord = null;
+
+            for (const record of records) {
+                const row = document.createElement("tr");
+                row.className = "record-row";
+                row.tabIndex = 0;
+                row.setAttribute("role", "button");
+                row.setAttribute("aria-selected", "false");
+                row.dataset.id = record.transaction_id;
+                row.dataset.record = JSON.stringify(record);
+
+                for (const value of [record.transaction_title, amountFormatter.format(Number(record.amount)), record.description]) {
+                    const cell = document.createElement("td");
+                    cell.textContent = value;
+                    if (value === amountFormatter.format(Number(record.amount))) cell.className = "record-amount";
+                    row.append(cell);
+                }
+
+                const selectRow = () => showEditor(JSON.parse(row.dataset.record));
+                row.addEventListener("click", selectRow);
+                row.addEventListener("keydown", (event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        selectRow();
+                    }
+                });
+                recordsBody.append(row);
+            }
+
+            recordsTable.hidden = records.length === 0;
+            resultsStatus.dataset.state = "";
+            resultsStatus.textContent = records.length
+                ? `${records.length} matching transaction${records.length === 1 ? "" : "s"}. Select a row to edit or delete.`
+                : "No matching transactions found.";
+        }
+
+        searchForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            searchButton.disabled = true;
+            resultsStatus.dataset.state = "loading";
+            resultsStatus.textContent = "Searching...";
+
+            try {
+                const response = await fetch(`/api/transactions/search?title=${encodeURIComponent(titleSearch.value.trim())}`, {
+                    headers: { Accept: "application/json" }
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || `Request failed (${response.status})`);
+                renderRecords(result);
+            } catch (error) {
+                recordsTable.hidden = true;
+                resultsStatus.dataset.state = "error";
+                resultsStatus.textContent = `Unable to search transactions. ${error.message}`;
+            } finally {
+                searchButton.disabled = false;
+            }
+        });
+
+        editorForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            if (!selectedRecord) return;
+
+            const saveButton = document.getElementById("save-edit");
+            saveButton.disabled = true;
+            editorStatus.dataset.state = "loading";
+            editorStatus.textContent = "Saving changes...";
+            const formData = new FormData(editorForm);
+            const updatedRecord = {
+                transaction_title: formData.get("transaction_title").trim(),
+                type: formData.get("type"),
+                amount: Number(formData.get("amount")),
+                description: formData.get("description").trim()
+            };
+
+            try {
+                const response = await fetch(`/api/transactions/${selectedRecord.transaction_id}`, {
+                    method: "PUT",
+                    headers: { Accept: "application/json", "Content-Type": "application/json" },
+                    body: JSON.stringify(updatedRecord)
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || `Request failed (${response.status})`);
+
+                editorStatus.dataset.state = "success";
+                editorStatus.textContent = "Transaction updated.";
+                await searchForm.requestSubmit();
+                await loadSummary();
+            } catch (error) {
+                editorStatus.dataset.state = "error";
+                editorStatus.textContent = `Unable to update transaction. ${error.message}`;
+            } finally {
+                saveButton.disabled = false;
+            }
+        });
+
+        document.getElementById("cancel-edit").addEventListener("click", () => {
+            recordEditor.hidden = true;
+            selectedRecord = null;
+            for (const row of recordsBody.rows) row.setAttribute("aria-selected", "false");
+        });
+
+        deleteRecordButton.addEventListener("click", async () => {
+            if (!selectedRecord) return;
+            deleteRecordButton.disabled = true;
+            editorStatus.dataset.state = "loading";
+            editorStatus.textContent = "Deleting transaction...";
+
+            try {
+                const response = await fetch(`/api/transactions/${selectedRecord.transaction_id}`, {
+                    method: "DELETE",
+                    headers: { Accept: "application/json" }
+                });
+                const result = await response.json();
+                if (!response.ok) throw new Error(result.error || `Request failed (${response.status})`);
+
+                editorStatus.dataset.state = "success";
+                editorStatus.textContent = "Transaction deleted.";
+                await searchForm.requestSubmit();
+                await loadSummary();
+            } catch (error) {
+                deleteRecordButton.disabled = false;
+                editorStatus.dataset.state = "error";
+                editorStatus.textContent = `Unable to delete transaction. ${error.message}`;
+            }
+        });
+
+        transactionForm.addEventListener("submit", async (event) => {
+            event.preventDefault();
+            submitTransaction.disabled = true;
+            formStatus.dataset.state = "loading";
+            formStatus.textContent = "Adding transaction...";
+
+            const formData = new FormData(transactionForm);
+            const transaction = {
+                transaction_title: formData.get("transaction_title").trim(),
+                type: formData.get("type"),
+                amount: Number(formData.get("amount")),
+                description: formData.get("description").trim()
+            };
+
+            try {
+                const response = await fetch("/api/addTransaction", {
+                    method: "POST",
+                    headers: {
+                        Accept: "application/json",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify(transaction)
+                });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || `Request failed (${response.status})`);
+                }
+
+                transactionForm.reset();
+                formStatus.dataset.state = "success";
+                formStatus.textContent = "Transaction added.";
+                await loadSummary();
+            } catch (error) {
+                formStatus.dataset.state = "error";
+                formStatus.textContent = `Unable to add transaction. ${error.message}`;
+            } finally {
+                submitTransaction.disabled = false;
+            }
+        });
+
+        loadSummary();
+    </script>
+</body>
+</html>
